@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.Resources
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Rect
 import android.media.MediaPlayer
 import android.speech.tts.Voice
@@ -29,6 +28,7 @@ import com.google.mlkit.nl.translate.TranslateLanguage
 import com.google.mlkit.nl.translate.TranslateRemoteModel
 import com.google.mlkit.nl.translate.Translation
 import com.google.mlkit.nl.translate.TranslatorOptions
+import com.lagradost.quicknovel.decodeSampledBitmap
 import com.lagradost.quicknovel.BaseApplication.Companion.context
 import com.lagradost.quicknovel.BaseApplication.Companion.getKey
 import com.lagradost.quicknovel.BaseApplication.Companion.getKeyClass
@@ -173,7 +173,7 @@ abstract class AbstractBook {
     fun loadImageBitmap(image: String): Bitmap? {
         try {
             val data = this.loadImage(image) ?: return null
-            return BitmapFactory.decodeByteArray(data, 0, data.size)
+            return decodeSampledBitmap(data)
         } catch (t: Throwable) {
             logError(t)
             return null
