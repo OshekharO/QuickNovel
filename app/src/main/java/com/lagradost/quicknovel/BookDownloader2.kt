@@ -18,6 +18,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import android.util.LruCache
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
@@ -166,7 +167,13 @@ object BookDownloader2Helper {
         return "$fs$apiName$fs$author$fs$name${fs}poster.jpg".replace("$fs$fs", "$fs")
     }
 
-    private val cachedBitmaps = hashMapOf<String, Bitmap>()
+    private const val CACHED_BITMAP_MAX_BYTES = 8 * 1024 * 1024 // 8MB
+    private const val CACHED_BITMAP_TARGET_DIMENSION = 512
+    private val cachedBitmaps = object : LruCache<String, Bitmap>(CACHED_BITMAP_MAX_BYTES) {
+        override fun sizeOf(key: String, value: Bitmap): Int {
+            return value.byteCount
+        }
+    }
     fun getCachedBitmap(
         activity: Activity?,
         apiName: String,
@@ -186,14 +193,44 @@ object BookDownloader2Helper {
 
             val file = activity.filesDir.toString() + filePath
             val data = File(file).readBytes()
-            val bitmap = BitmapFactory.decodeByteArray(data, 0, data.size)
-            cachedBitmaps[filePath] = bitmap
+            val optsBounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(data, 0, data.size, optsBounds)
+            val optsDecode = BitmapFactory.Options().apply {
+                inSampleSize = calculateInSampleSize(
+                    optsBounds,
+                    CACHED_BITMAP_TARGET_DIMENSION,
+                    CACHED_BITMAP_TARGET_DIMENSION
+                )
+            }
+            val bitmap = BitmapFactory.decodeByteArray(data, 0, data.size, optsDecode)
+            if (bitmap != null) {
+                cachedBitmaps.put(filePath, bitmap)
+            }
 
             return bitmap
         } catch (t: Throwable) {
             logError(t)
             return null
         }
+    }
+
+    private fun calculateInSampleSize(
+        options: BitmapFactory.Options,
+        reqWidth: Int,
+        reqHeight: Int
+    ): Int {
+        val (height: Int, width: Int) = options.outHeight to options.outWidth
+        var inSampleSize = 1
+
+        if (height > reqHeight || width > reqWidth) {
+            var halfHeight = height / 2
+            var halfWidth = width / 2
+
+            while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
+                inSampleSize *= 2
+            }
+        }
+        return inSampleSize.coerceAtLeast(1)
     }
 
     fun generateId(apiName: String, author: String?, name: String): Int {
