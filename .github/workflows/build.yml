@@ -94,7 +94,7 @@ jobs:
           echo "RELEASE_NAME=${RELEASE_NAME}" >> $GITHUB_ENV
 
       - name: Create GitHub release
-        uses: softprops/action-gh-release@v2.0.8
+        uses: softprops/action-gh-release@v2.5.0
         with:
           tag_name: ${{ env.TAG_NAME }}
           name: ${{ env.RELEASE_NAME }}
