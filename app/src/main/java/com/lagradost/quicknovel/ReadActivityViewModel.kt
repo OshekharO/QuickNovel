@@ -195,7 +195,7 @@ abstract class AbstractBook {
     init {
         ioSafe {
             poster = posterBytes()?.let { byteArray ->
-                BitmapFactory.decodeByteArray(byteArray, 0, byteArray.size)
+                decodeSampledBitmap(byteArray)
             }
         }
     }

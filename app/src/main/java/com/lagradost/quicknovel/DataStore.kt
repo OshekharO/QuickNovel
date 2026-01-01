@@ -89,7 +89,6 @@ data class Editor(
 
     fun apply() {
         editor.apply()
-        System.gc()
     }
 }
 

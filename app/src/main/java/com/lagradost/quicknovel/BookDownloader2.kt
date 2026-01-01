@@ -18,6 +18,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import android.util.LruCache
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
@@ -166,7 +167,12 @@ object BookDownloader2Helper {
         return "$fs$apiName$fs$author$fs$name${fs}poster.jpg".replace("$fs$fs", "$fs")
     }
 
-    private val cachedBitmaps = hashMapOf<String, Bitmap>()
+    private const val POSTER_CACHE_SIZE_KB = 8 * 1024
+    private val cachedBitmaps = object : LruCache<String, Bitmap>(POSTER_CACHE_SIZE_KB) {
+        override fun sizeOf(key: String, value: Bitmap): Int {
+            return value.byteCount / 1024
+        }
+    }
     fun getCachedBitmap(
         activity: Activity?,
         apiName: String,
@@ -180,14 +186,16 @@ object BookDownloader2Helper {
                 sanitizeFilename(name)
             )
 
-            val existing = cachedBitmaps.get(filePath)
+            val existing = synchronized(cachedBitmaps) { cachedBitmaps.get(filePath) }
             if (existing != null) return existing
             if (activity == null) return null
 
             val file = activity.filesDir.toString() + filePath
             val data = File(file).readBytes()
-            val bitmap = BitmapFactory.decodeByteArray(data, 0, data.size)
-            cachedBitmaps[filePath] = bitmap
+            val bitmap = decodeSampledBitmap(data)
+            if (bitmap != null) {
+                synchronized(cachedBitmaps) { cachedBitmaps.put(filePath, bitmap) }
+            }
 
             return bitmap
         } catch (t: Throwable) {
@@ -1020,21 +1028,26 @@ object NotificationHelper {
 }
 
 object ImageDownloader {
+    private const val POSTER_CACHE_SIZE_KB = 8 * 1024
+    private const val POSTER_TARGET_SIZE = 512
     private val cachedBitmapMutex = Mutex()
-    private val cachedBitmaps = hashMapOf<String, Bitmap>()
+    private val cachedBitmaps = object : LruCache<String, Bitmap>(POSTER_CACHE_SIZE_KB) {
+        override fun sizeOf(key: String, value: Bitmap): Int {
+            return value.byteCount / 1024
+        }
+    }
 
     suspend fun Context.getImageBitmapFromUrl(url: String, headers: Map<String, String>? = null): Bitmap? {
         try {
-            with(cachedBitmapMutex) {
-                if (cachedBitmaps.containsKey(url)) {
-                    return cachedBitmaps[url]
-                }
+            cachedBitmapMutex.withLock {
+                cachedBitmaps.get(url)?.let { return it }
             }
 
             val imageLoader = SingletonImageLoader.get(this)
 
             val request = ImageRequest.Builder(this)
                 .data(url)
+                .size(POSTER_TARGET_SIZE, POSTER_TARGET_SIZE)
                 .apply {
                     headers?.forEach { (key, value) ->
                         extras[Extras.Key<String>(key)] = value
@@ -1049,8 +1062,8 @@ object ImageDownloader {
             }
 
             bitmap?.let {
-                with(cachedBitmapMutex) {
-                    cachedBitmaps[url] = it
+                cachedBitmapMutex.withLock {
+                    cachedBitmaps.put(url, it)
                 }
             }
 
@@ -1060,6 +1073,37 @@ object ImageDownloader {
             return null
         }
     }
+}
+
+fun decodeSampledBitmap(data: ByteArray, reqWidth: Int = 512, reqHeight: Int = 512): Bitmap? {
+    return try {
+        val options = BitmapFactory.Options().apply {
+            inJustDecodeBounds = true
+        }
+        BitmapFactory.decodeByteArray(data, 0, data.size, options)
+        options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight)
+        options.inJustDecodeBounds = false
+        BitmapFactory.decodeByteArray(data, 0, data.size, options)
+    } catch (t: Throwable) {
+        logError(t)
+        null
+    }
+}
+
+private fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
+    val (height, width) = options.outHeight to options.outWidth
+    var inSampleSize = 1
+
+    if (height > reqHeight || width > reqWidth) {
+        var halfHeight = height / 2
+        var halfWidth = width / 2
+
+        while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
+            inSampleSize *= 2
+        }
+    }
+
+    return inSampleSize
 }
 
 object BookDownloader2 {
