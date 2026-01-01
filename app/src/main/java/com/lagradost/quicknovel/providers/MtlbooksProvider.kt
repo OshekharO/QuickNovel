@@ -16,8 +16,8 @@ import com.lagradost.quicknovel.newSearchResponse
 import com.lagradost.quicknovel.newStreamResponse
 import com.lagradost.quicknovel.providers.WebnovelFanficProvider.Companion.MOBILE_USER_AGENT
 import com.lagradost.quicknovel.setStatus
+import com.lagradost.quicknovel.network.CloudflareKiller
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
@@ -158,6 +158,26 @@ class MtlbooksProvider : MainAPI()
     val minBooksNeeded=11
     val maxPagesToFetch=10
     val apiURL="https://alpha.mtlbooks.com/api/v1/"
+    private val cloudflareInterceptor by lazy { CloudflareKiller() }
+    private val cloudflareClient by lazy {
+        app.baseClient.newBuilder()
+            .addInterceptor(cloudflareInterceptor)
+            .build()
+    }
+    private fun cloudflareGet(url: String): String? {
+        val request = Request.Builder()
+            .url(url)
+            .get()
+            .addHeader("User-Agent", MOBILE_USER_AGENT)
+            .build()
+        return try {
+            cloudflareClient.newCall(request).execute().use { response ->
+                if (response.isSuccessful) response.body?.string() else null
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
 
     val seenUrls = HashSet<String>()
     data class ChapterInfo(
@@ -187,8 +207,7 @@ class MtlbooksProvider : MainAPI()
             .addHeader("Referer", "$mainUrl")
             .build()
 
-        val client = OkHttpClient()
-        client.newCall(request).execute().use { response ->
+        cloudflareClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 Log.e("MTL BOOKS", "Request failed with code ${response.code}")
                 return JSONObject()
@@ -253,8 +272,7 @@ class MtlbooksProvider : MainAPI()
             .addHeader("Referer", "$mainUrl")
             .build()
 
-        val client = OkHttpClient()
-        client.newCall(request).execute().use { response ->
+        cloudflareClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 Log.e("MTL BOOKS", "Request failed with code ${response.code}")
                 return JSONObject()
@@ -296,8 +314,8 @@ class MtlbooksProvider : MainAPI()
 
         suspend fun fetchPage(p: Int): Pair<List<SearchResponse>, Boolean> {
             val url = "${apiURL}search/?page=${p}&order=${orderBy}&include_genres=${tag}&status=${mainCategory}"
-            val response = app.get(url)
-            val json=JSONObject(response.text)
+            val responseText = cloudflareGet(url) ?: return Pair(emptyList(), false)
+            val json=JSONObject(responseText)
             val result=json.getJSONObject("result")
             val items = result.getJSONArray("data")
             val hadAnyRawItems = items.length() > 0
@@ -364,8 +382,8 @@ class MtlbooksProvider : MainAPI()
     override suspend fun load(url: String): StreamResponse {
         isOpeningBook=true
 
-        val response = app.get(url)
-        val json=JSONObject(response.text)
+        val responseText = cloudflareGet(url) ?: throw ErrorLoadingException("Failed to load book")
+        val json=JSONObject(responseText)
         val result=json.getJSONObject("result")
         val title = result.optString("name", "Untitled")
         val description = result.optString("description", "")
@@ -442,8 +460,8 @@ class MtlbooksProvider : MainAPI()
         val results = mutableListOf<SearchResponse>()
 
         val url = "${apiURL}search/?q=$encodedQuery&page=$page&order=popular"
-        val response = app.get(url)
-        val json=JSONObject(response.text)
+        val responseText = cloudflareGet(url) ?: return results
+        val json=JSONObject(responseText)
         val result=json.getJSONObject("result")
         val items = result.getJSONArray("data")
         val pageend=result.getJSONObject("pagination").optInt("totalPages")
