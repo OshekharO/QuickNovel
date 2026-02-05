@@ -53,6 +53,10 @@ object BookHelper {
         _allWords.clear()
         _allWords.addAll(_ogWords)
     }
+    fun checkforchanges(): Boolean {
+        if(_allWords == _ogWords) return false
+        return true
+    }
 
     fun load(context: Context, bookKey: String) {
         clearAll()
@@ -81,6 +85,7 @@ object BookHelper {
 
     fun ReplaceText(inputText: String): String {
         android.util.Log.d("BOOK HELPER","REPLACE CALLED")
+        android.util.Log.d("BOOK HELPER","Text: ${inputText.length}")
         val rules = All_Words
         if (rules.isEmpty()) return inputText
         android.util.Log.d("BOOK HELPER","RULES OK")

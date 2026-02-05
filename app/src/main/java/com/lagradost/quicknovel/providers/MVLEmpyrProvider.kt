@@ -4,6 +4,7 @@ import android.util.Log
 import com.lagradost.quicknovel.*
 import com.lagradost.quicknovel.MainActivity.Companion.app
 import com.lagradost.quicknovel.utils.CloudflareWebViewLoader
+import com.lagradost.quicknovel.utils.WebViewPool
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -337,7 +338,7 @@ class MVLEmpyrProvider : MainAPI() {
     }
 
     private val webViewLoader by lazy {
-        CloudflareWebViewLoader(MainActivity.context)
+        CloudflareWebViewLoader(MainActivity.context, WebViewPool(MainActivity.context, maxSize = 4))
     }
 
 
