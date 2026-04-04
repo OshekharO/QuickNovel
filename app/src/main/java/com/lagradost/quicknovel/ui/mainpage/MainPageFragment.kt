@@ -72,6 +72,8 @@ class MainPageFragment : Fragment() {
 
     var isInSearch = false
 
+
+
     private fun setupGridView() {
         val compactView = false //activity?.getGridIsCompact() ?: return
         val spanCountLandscape = if (compactView) 2 else 6
@@ -154,7 +156,14 @@ class MainPageFragment : Fragment() {
 
             searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
                 override fun onQueryTextSubmit(query: String): Boolean {
-                    viewModel.search(query,1)//MainActivity.activeAPI.search(query)
+                    if(viewModel.api.infiniteScroll)
+                    {
+                        viewModel.search(query,1)
+                    }
+                    else{
+                        viewModel.search(query)
+                    }
+                    //MainActivity.activeAPI.search(query)
                     return true
                 }
 
@@ -190,7 +199,7 @@ class MainPageFragment : Fragment() {
                                 )
                             }
                         }
-                        else if (viewModel.hasQueryInput && !viewModel.api.api.isSearching && !viewModel.isLoadingSearch && visibleItemCount + pastVisiblesItems >= totalItemCount) {
+                        else if (viewModel.api.infiniteScroll && viewModel.hasQueryInput && !viewModel.api.api.isSearching && !viewModel.isLoadingSearch && visibleItemCount + pastVisiblesItems >= totalItemCount) {
                             viewModel.search(viewModel.currentSearchQuery.toString(),viewModel.searchPage+1)
                         }
                     } else if (dy < -5) {

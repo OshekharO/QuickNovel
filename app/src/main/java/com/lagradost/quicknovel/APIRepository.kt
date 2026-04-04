@@ -64,6 +64,7 @@ class APIRepository(val api: MainAPI) {
     val mainCategories: List<Pair<String, String>> get() = api.mainCategories
     val orderBys: List<Pair<String, String>> get() = api.orderBys
     val tags: List<Pair<String, String>> get() = api.tags
+    val infiniteScroll : Boolean get() = api.infiniteScroll
 
 
     suspend fun load(url: String, allowCache: Boolean = true): Resource<LoadResponse> {
@@ -110,7 +111,14 @@ class APIRepository(val api: MainAPI) {
 
     suspend fun search(query: String): Resource<List<SearchResponse>> {
         return safeApiCall {
-            api.search(query) ?: throw ErrorLoadingException("No data")
+            try {
+                api.search(query) ?: throw ErrorLoadingException("No data")
+            }
+            catch(e: NotImplementedError)
+            {
+               android.util.Log.d("Search", "Provider ${api.name} hasn't implemented Normal search yet")
+                api.search(query,1) ?: throw ErrorLoadingException("No data")
+            }
         }
     }
     suspend fun search(query: String,page: Int): Resource<List<SearchResponse>> {
@@ -118,7 +126,8 @@ class APIRepository(val api: MainAPI) {
             try {
                 api.search(query, page) ?: throw ErrorLoadingException("No data")
             } catch (e: NotImplementedError) {
-                api.search(query) ?: throw ErrorLoadingException("No data")
+                android.util.Log.d("Search", "Provider ${api.name} hasn't implemented Infinite search yet")
+                emptyList<SearchResponse>()
             }
         }
     }

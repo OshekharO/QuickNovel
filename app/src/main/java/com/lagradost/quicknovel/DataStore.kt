@@ -252,11 +252,12 @@ object DataStore {
 //        ) ?: emptyList()
         return raw.mapNotNull { item ->
             val map = item as? Map<*, *> ?: return@mapNotNull null
-
+            android.util.Log.d("BOOK HELPER","${map["word"]} => ${map["replacement_Word"]}")
             Replacer_Data(
                 word = map["word"] as? String ?: "",
                 replacement_Word = map["replacement_Word"] as? String ?: ""
             )
+
         }
     }
 

@@ -1,11 +1,15 @@
 package com.lagradost.quicknovel.mvvm
 
 import android.content.Context
+import androidx.core.text.HtmlCompat
+import com.lagradost.quicknovel.CommonActivity.showToast
 import com.lagradost.quicknovel.DataStore.clearBookReplacers
 import com.lagradost.quicknovel.DataStore.loadBookReplacers
 import com.lagradost.quicknovel.DataStore.saveBookReplacers
+import org.jsoup.parser.Parser
 import java.util.regex.Matcher
 import java.util.regex.Pattern
+
 
 object BookHelper {
 
@@ -82,12 +86,16 @@ object BookHelper {
             clearAll()
         }
     }
+    fun decodeEntitiesOnly(text: String): String {
+        return Parser.unescapeEntities(text, false)
+    }
 
     fun ReplaceText(inputText: String): String {
         android.util.Log.d("BOOK HELPER","REPLACE CALLED")
         android.util.Log.d("BOOK HELPER","Text: ${inputText.length}")
+        val normalText = decodeEntitiesOnly(inputText)
         val rules = All_Words
-        if (rules.isEmpty()) return inputText
+        if (rules.isEmpty()) return normalText
         android.util.Log.d("BOOK HELPER","RULES OK")
 
         // Detect changes to avoid rebuilding regex every time
@@ -100,19 +108,24 @@ object BookHelper {
                 .filter { it.word.isNotBlank() }
                 .associate { it.word.lowercase() to it.replacement_Word }
 
-            if (cachedMap.isEmpty()) return inputText
+            if (cachedMap.isEmpty()) return normalText
+            android.util.Log.d("BOOK HELPER","Cached Map ${cachedMap}")
 
-            val regex = cachedMap.keys.joinToString("|") {
-                "\\b${Pattern.quote(it)}\\b"
+            val regex = cachedMap.keys.joinToString("|") { key ->
+                if (key.all { it.isLetterOrDigit() || it == '_' }) {
+                    "\\b${Pattern.quote(key)}\\b"
+                } else {
+                    Pattern.quote(key) // NO word boundary
+                }
             }
 
             cachedPattern = Pattern.compile(regex, Pattern.CASE_INSENSITIVE)
         }
 
-        android.util.Log.d("BOOK HELPER","PATTERN OK")
+        android.util.Log.d("BOOK HELPER","PATTERN OK  ${cachedPattern}")
 
-        val matcher = cachedPattern!!.matcher(inputText)
-        val result = StringBuffer(inputText.length)
+        val matcher = cachedPattern!!.matcher(normalText)
+        val result = StringBuffer(normalText.length)
 
         while (matcher.find()) {
             val replacement = cachedMap[matcher.group().lowercase()] ?: matcher.group()
@@ -121,6 +134,8 @@ object BookHelper {
         matcher.appendTail(result)
 
         android.util.Log.d("BOOK HELPER","REPLACE COMPLETE")
+
+        showToast("REPLACEMENT COMPLETE")
 
         return result.toString()
     }

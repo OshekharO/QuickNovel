@@ -22,6 +22,7 @@ open class WuxiaBoxProvider :  MainAPI() {
     override val iconId = R.drawable.icon_wuxiabox
 
     override val hasMainPage = true
+    override val infiniteScroll=true
 
     override val mainCategories = listOf(
         "All" to "all",
@@ -281,7 +282,6 @@ open class WuxiaBoxProvider :  MainAPI() {
 
 
         var currentPage = page-1
-        val results = mutableListOf<SearchResponse>()
         val encodedQuery = java.net.URLEncoder.encode(query, "UTF-8")
 
         val response = app.post(
@@ -303,7 +303,12 @@ open class WuxiaBoxProvider :  MainAPI() {
         val url = "$mainUrl/e/search/result/index.php?page=$currentPage&searchid=$searchId"
         val document = app.get(url, timeout = 60).document
 
-        val pageResults = document.select("li.novel-item").mapNotNull { element ->
+        val isLastPageReached = document.selectFirst("ul.pagination a:matchesOwn(^>$|^>>$)") == null
+
+        isLastPage=isLastPageReached
+
+
+        return document.select("li.novel-item").mapNotNull { element ->
             val node = element.selectFirst("a[title]") ?: return@mapNotNull null
             val href = fixUrl(node.attr("href"))
             val title = node.attr("title")
@@ -324,18 +329,6 @@ open class WuxiaBoxProvider :  MainAPI() {
                 totalChapterCount = chapterCount
             }
         }
-        if(pageResults.isNotEmpty())
-        {
-            results.addAll(pageResults)
-        }
-        else
-        {
-            isLastPage=true
-        }
-
-
-
-        return results
 
 
     }

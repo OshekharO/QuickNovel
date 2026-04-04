@@ -15,6 +15,7 @@ import com.lagradost.quicknovel.newChapterData
 import com.lagradost.quicknovel.newSearchResponse
 import com.lagradost.quicknovel.newStreamResponse
 import com.lagradost.quicknovel.setStatus
+import com.lagradost.safefile.TAG
 import org.jsoup.Jsoup
 import kotlin.math.roundToInt
 
@@ -24,6 +25,7 @@ class NovelFireProvider :  MainAPI() {
     override val iconId = R.drawable.icon_novelfire
 
     override val hasMainPage = true
+    override val infiniteScroll=true
 
     override val mainCategories = listOf(
         "All" to "status-all",
@@ -290,7 +292,9 @@ class NovelFireProvider :  MainAPI() {
         val searchList = document.select("ul.novel-list.horizontal.col2.chapters").firstOrNull()
         val novels = searchList?.select("li.novel-item") ?: emptyList()
 
-        if (novels.isEmpty()) {
+        val isLastPageReached = document.selectFirst("ul.pagination li.page-item.disabled[aria-label^='Next']") != null
+
+        if (isLastPageReached) {
             fetchedAll = true
             isLastPage=true
         }
@@ -298,8 +302,10 @@ class NovelFireProvider :  MainAPI() {
         for (element in novels) {
             val anchor = element.selectFirst("a") ?: continue
             val title = anchor.attr("title").trim()
-            val novelUrl = anchor.absUrl("href")
-            val coverUrl = anchor.selectFirst("img")?.absUrl("src") ?: ""
+            val novelUrl = mainUrl+anchor.attr("href")
+            val coverUrl = mainUrl+anchor.selectFirst("img")?.attr("src") ?: ""
+
+            //Log.d(TAG,"$novelUrl    ${anchor.selectFirst("img")?.attr("src")}");
 
             // Extract chapter count
             val chapterStat = anchor.select("div.novel-stats").firstOrNull { stat ->

@@ -19,6 +19,7 @@ open class AllNovelProvider : MainAPI() {
     override val name = "AllNovel"
     override val mainUrl = "https://allnovel.org"
     override val hasMainPage = true
+    override val infiniteScroll=true
 
     override val iconId = R.drawable.icon_allnovel
 
@@ -149,6 +150,29 @@ open class AllNovelProvider : MainAPI() {
     override suspend fun search(query: String): List<SearchResponse> {
         val document =
             app.get("$mainUrl/search?keyword=$query").document // AJAX, MIGHT ADD QUICK SEARCH
+
+        return document.select("#list-page>.archive>.list>.row").mapNotNull { h ->
+            val title = h.selectFirst(">div>div>.truyen-title>a")
+                ?: h.selectFirst(">div>div>.novel-title>a") ?: return@mapNotNull null
+            val chapterText = h.selectFirst("span.chapter-text")?.text()
+            val chapterNumber = chapterText?.let {
+                Regex("""Chapter\s+(\d+)""").find(it)?.groupValues?.get(1)
+            }
+            newSearchResponse(title.text(), title.attr("href") ?: return@mapNotNull null) {
+                posterUrl = fixUrlNull(h.selectFirst(">div>div>img")?.attr("src"));
+                totalChapterCount=chapterNumber
+            }
+        }
+    }
+
+    override suspend fun search(query: String,page: Int): List<SearchResponse> {
+        val document = app.get("$mainUrl/search?keyword=$query&page=$page").document // AJAX, MIGHT ADD QUICK SEARCH
+
+
+
+        val isLastPageReached = document.selectFirst("ul.pagination li.last.disabled") != null
+        isLastPage=isLastPageReached
+
 
         return document.select("#list-page>.archive>.list>.row").mapNotNull { h ->
             val title = h.selectFirst(">div>div>.truyen-title>a")

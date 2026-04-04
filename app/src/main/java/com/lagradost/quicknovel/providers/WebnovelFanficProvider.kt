@@ -21,6 +21,7 @@ class WebnovelFanficProvider : MainAPI() {
     override val mainUrl = "https://m.webnovel.com"
     override val hasMainPage = true
     override val iconId = R.drawable.icon_webnovel // Replace with your actual icon
+    override val infiniteScroll=true
 
     companion object {
         const val MOBILE_USER_AGENT =

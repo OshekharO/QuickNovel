@@ -42,6 +42,7 @@ abstract class MainAPI {
 
     open val iconId: Int? = null
     open val iconBackgroundId: Int = R.color.primaryGrayBackground
+    open val infiniteScroll=false
 
     open suspend fun loadMainPage(
         page: Int,
