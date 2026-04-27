@@ -31,6 +31,8 @@ class MtlbooksProvider : MainAPI()
 
     override val iconId = R.drawable.icon_mtlbooks
 
+    override val infiniteScroll=true
+
     override val mainCategories = listOf(
         "All" to "",
         "Completed" to "Completed",

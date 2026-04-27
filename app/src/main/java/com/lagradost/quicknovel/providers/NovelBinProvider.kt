@@ -20,6 +20,7 @@ class NovelBinProvider : MainAPI() {
     override val name = "NovelBin"
     override val mainUrl = "https://novelbin.com"
     override val hasMainPage = true
+    override val infiniteScroll=true
 
     override val iconId = R.drawable.icon_novelbin
 
@@ -139,6 +140,27 @@ class NovelBinProvider : MainAPI() {
     override suspend fun search(query: String): List<SearchResponse> {
         val document =
             app.get("$mainUrl/search?keyword=$query").document // AJAX, MIGHT ADD QUICK SEARCH
+
+        return document.select("#list-page>.archive>.list>.row").mapNotNull { h ->
+            val title = h.selectFirst(">div>div>.truyen-title>a")
+                ?: h.selectFirst(">div>div>.novel-title>a") ?: return@mapNotNull null
+            val latestChapNum = h.selectFirst("div.col-xs-2.text-info a")
+                ?.text()
+                ?.let { Regex("""\d+""").find(it)?.value }
+            newSearchResponse(title.text(), title.attr("href") ?: return@mapNotNull null) {
+                posterUrl = fixUrlNull(h.selectFirst(">div>div>img")?.attr("src")?.replace( fullPosterRegex, "/novel/"))
+                totalChapterCount=latestChapNum
+            }
+        }
+    }
+
+    override suspend fun search(query: String,page: Int): List<SearchResponse> {
+        val document =app.get("$mainUrl/search?keyword=$query&page=$page").document // AJAX, MIGHT ADD QUICK SEARCH
+
+        val isLastPageReached = document.selectFirst("ul.pagination li.last.disabled") != null
+        isLastPage=isLastPageReached
+
+
 
         return document.select("#list-page>.archive>.list>.row").mapNotNull { h ->
             val title = h.selectFirst(">div>div>.truyen-title>a")

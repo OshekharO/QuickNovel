@@ -28,6 +28,7 @@ class RoyalRoadProvider : MainAPI() {
     override val mainUrl = "https://www.royalroad.com"
     override val rateLimitTime = 500L
     override val hasMainPage = true
+    override val infiniteScroll=true
 
     override val iconId = R.drawable.big_icon_royalroad
 
@@ -307,6 +308,35 @@ class RoyalRoadProvider : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         val document = app.get("$mainUrl/fictions/search?title=$query").document
+
+        return document.select("div.fiction-list-item").mapNotNull { h ->
+            val head = h.selectFirst("> div.search-content")
+            val hInfo = head?.selectFirst("> h2.fiction-title > a")
+
+            val name = hInfo?.text() ?: return@mapNotNull null
+            val url = hInfo.attr("href")
+
+            newSearchResponse(url = url, name = name) {
+                posterUrl = fixUrlNull(h.selectFirst("> figure.text-center > a > img")?.attr("src"))
+                rating =
+                    head.selectFirst("> div.stats")?.select("> div")?.get(1)?.selectFirst("> span")
+                        ?.attr("title")?.toFloatOrNull()?.times(200)?.toInt()
+                // latestChapter = h.select("div.stats > div.col-sm-6 > span")[4].text()
+                val chapterCountText = h.selectFirst("div.stats div.col-sm-6:has(i.fa-list) span")?.text()
+                val chapterCount = chapterCountText?.substringBefore(" ")
+                totalChapterCount=chapterCount
+            }
+        }
+    }
+
+    override suspend fun search(query: String,page: Int): List<SearchResponse> {
+        val document = app.get("$mainUrl/fictions/search?title=$query&page=$page").document
+
+        val lastPageElement = document.selectFirst("ul.pagination a[data-page]:contains(Last)")
+        val hasLastPage = lastPageElement != null
+
+        isLastPage=!hasLastPage
+
 
         return document.select("div.fiction-list-item").mapNotNull { h ->
             val head = h.selectFirst("> div.search-content")
